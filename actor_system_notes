@@ -1,0 +1,82 @@
+
+
+
+
+
+
+
+
+
+Actor
+
+
+
+ActorSystem
+
+- Router: how to send messages
+	A router is used to send messages 
+- address
+- server: actor systems must run a server so they can receive messages.  The
+  server will operate using a tcp connection or unix fifo.  Server information
+  will come from configurations defined by the user in the ActorSystem.
+
+  For a video game, we'd have two actor systems on the backend: one to receive
+  client requests, and a second to handle game state and logic.  The API layer
+  should operate with a fleet of identical state-less actors which handle API
+  requests and send messages to the game actor system.  The game actor system
+  would have many actors, each with a different type according to its entity in
+  the game.
+
+
+
+Client
+
+ActorSystem system = new ActorSystem("game")
+
+
+
+Server
+
+ActorSystem serverSystem = new ActorSystem("server", )
+
+
+class ActorRef {
+	
+	ActorSystem _system;
+	Actor _actor;
+	String _path;
+
+	Future init() {
+		// call the actor's init function asynchronously
+		return Future.delayed(this._actor.init);	
+	}
+
+	void sendMessage(ActorRef receiver, var message);	
+}
+
+
+class ActorRecord {
+	final Actor a;
+	final ActorRef ref;
+}
+
+class ActorSystem {
+
+	Map<String, ActorRecord> _actors;
+	
+	/// Create an actor in the system.
+	/// This function returns a future, which completes once
+	/// the actor finishes its initialization procedures.
+	Future<ActorRef> spawnActor(Actor a) {
+		var ref = refFromActor(a);
+		this._actors[a.address] = new ActorRecord(a, ref);
+		return ref.init();
+	}
+
+	/// Return the ActorRef for an already created actor.
+	ActorRef getRef(String path) {
+		return this._actors[path].ref;
+	}
+
+
+}

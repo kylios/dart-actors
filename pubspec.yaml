@@ -1,0 +1,6 @@
+name: actors
+version: 0.0.0
+author: Kyle Racette <kracette@gmail.com>
+description: 
+dependencies:
+    test: any

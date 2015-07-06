@@ -1,0 +1,33 @@
+
+# Concept
+
+30 Days will be a multiplayer top-down action-adventure game.
+The controls and environment will feel Zelda-esque, with large 
+regions loading at once and the viewport scrolling with the 
+player's movements.  Each region should be capable of supporting
+a decently large number of players, so that player interaction
+occurs frequently, but there remains a strong need to explore and
+develop your character independetly as well.  Combat happens in 
+real-time, and the player may possess and use a number of active
+(activates in response to a direct user-action) weapons and abilities and a  number of passive (activates in response to game event) weapons
+or abilities.  Some of these items are consumable.  Weapons and items 
+may also  be equipped to many slots on the player.  The player will
+acquire various items by picking them up on the map or through 
+trading with other players.
+
+# Technical Considerations
+
+* large regions
+  * only a small subregion is displayed, but this area changes rapidly
+* many players per region
+* actions happen in real time
+  * player moves
+  * player picks up or drops items
+  * player alters the environment
+  * player uses a weapon, item, or ability
+  * player equips items
+  * player exits or enters the region
+* there are a number of regions (50ish)
+
+## design
+

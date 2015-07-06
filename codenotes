@@ -1,0 +1,60 @@
+
+
+Level needs to be a library, responsible for the entire state
+of the level.  It should be accessed only through a strict
+api.  Changes made to the level need to be atomic, and specified 
+as distinct commands, such that we can retrieve the state of the
+level at any given time.  This will be important for syncing
+level state with clients.
+
+The Level class should be usable on both the client and the 
+server.  The server will, of course, be the authoritative 
+member in this system, but the data and interface backing
+the Level class should remain the same.  Every actor that
+is spawned inside the level will be given a handle with 
+which it can send events to the Level.  Levels have two
+channels with which they can make and broadcast changes:
+the actor movement channel, and the world update channel.
+Events sent to either channel should also trigger 
+
+
+
+
+Game runs on server and on client.  Client connects and downloads
+the state of the game.  From there, the game server's input source
+is the user input coming from the client, and the game client's 
+input source comes from a data stream originating from the server.
+
+///
+/// Class GameInstance is an actor system.  It can hold some state,
+/// but its primary job is managing a pool of actors and marshalling
+/// messages to and from actors within the system.
+class GameInstance extends ActorSystem {
+	
+	Level _currentLevel;
+
+	/// 
+	ActorRef spawnEventActor(EventActor a) {
+
+		a._init();
+		// Initialize actor a in the actor system
+	}
+}
+
+class GameInstanceActor extends Actor {
+
+	LevelActor _level;
+
+	GameInstanceActor(ActorSystem system, this._level) :
+		super(system);
+	
+	void _initHandlers() {
+		{
+			""
+
+		}
+	}
+}
+
+
+
