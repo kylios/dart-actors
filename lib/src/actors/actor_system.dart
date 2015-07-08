@@ -3,12 +3,16 @@ part of actors;
 class ActorSystem {
 
 	final String name;
-	final Map<String, Actor> _actors = new Map<String, Actor>();
+	final List<Actor> _actors = new List<Actor>();
+
+  final Actor _deadLetters = new DeadLetters();
 	
 	ActorSystem(this.name);	
 
-  Future<ActorRef> createActor(ClassMirror cls, 
+  Future<ActorRef> createActor(Type actorCls, 
       String actorName, [ActorProps props = null]) {
+
+    ClassMirror cls = reflectClass(actorCls);
 
     if (props == null) {
       props = new ActorProps.empty();
@@ -22,8 +26,10 @@ class ActorSystem {
   }
 
 	Future<ActorRef> _addActor(Actor a, String actorName, ActorProps props) async {
+    print("System: _addActor(name=$actorName)");
     await a._setUp(this, actorName, props);
-		this._actors[a.ref.path] = a;
+    print("System: adding ${a.ref}");
+		this._actors.add(a);
     return a.ref;
 	}
 
@@ -41,7 +47,12 @@ class ActorSystem {
       return;
     }
 
-    receiverActor._receiveMessage(sender, message);
+    receiverActor._messageQueue.add(new _MessagePair(sender, message));
 	}
 
+  void sendMessage(ActorRef receiver, dynamic message) {
+    this._sendMessage(this._deadLetters, receiver, message);
+  }
+
+  Map<String, int> statCounts(ActorRef ref) => ref._actor._stats._counts;
 }
