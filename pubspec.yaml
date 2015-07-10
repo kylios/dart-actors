@@ -4,3 +4,4 @@ author: Kyle Racette <kracette@gmail.com>
 description: 
 dependencies:
     test: any
+    path: any

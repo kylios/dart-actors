@@ -53,6 +53,19 @@ void main() {
           props_map.forEach((String name, dynamic value) =>
             expect(ref(name), equals(value)));
         });
+
+      test("can return messages", () async {
+
+          String systemName = "system";
+          ActorSystem system = new ActorSystem(systemName);
+
+          ActorRef ref = await system.createActor(PongActor, 'PONG');
+          expect(ref, isNot(equals(null)));
+          var message = await system.sendMessageSync(ref, "PING");
+
+          expect(system.statCounts(ref)['messages.handled'], equals(1));
+          expect(message, equals("PONG"));
+        });
     });
 
   group("Actors", () {
@@ -66,6 +79,7 @@ void main() {
           ActorRef pong = await pongFuture;
 
           expect(pong, isNot(equals(null)));
+          expect(pong.path, equals("${system.name}/${pong.name}"));
           expect(pong.active, equals(true));
 
           ActorRef ping = 
@@ -73,6 +87,7 @@ void main() {
               new ActorProps.fromMap({"receiver": pong}));
 
           expect(ping, isNot(equals(null)));
+          expect(ping.path, equals("${system.name}/${ping.name}"));
           expect(ping.active, equals(true));
 
           print("Actors created");
@@ -103,6 +118,26 @@ void main() {
           expect(pingCounts['messages.handled'], equals(12));
           expect(pongCounts['messages.sent'], equals(1));
           expect(pongCounts['messages.handled'], equals(2));
+        });
+
+      test("can manage children", () async {
+
+          ActorSystem system = new ActorSystem("system");
+
+          ActorRef parent1 = await system.createActor(TestParentActor, 'parent',
+            new ActorProps.empty());
+
+          expect(system.statCounts(parent1)['actors.begin_add'], equals(3));
+          expect(system.statCounts(parent1)['actors.end_add'], equals(3));
+
+          Map<String, int> child1Counts = await system.sendMessageSync(parent1, 'get_child1_counts');
+          Map<String, int> child2Counts = await system.sendMessageSync(parent1, 'get_child2_counts');
+          Map<String, int> child3Counts = await system.sendMessageSync(parent1, 'get_child3_counts');
+
+          expect(child1Counts['setup'], equals(1));
+          expect(child2Counts['setup'], equals(1));
+          expect(child3Counts['setup'], equals(1));
+
         });
     });
 }

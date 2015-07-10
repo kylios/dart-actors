@@ -57,14 +57,16 @@ class ActorProps {
 /// actor system can convert an actor ref into an actor, but only does so 
 /// internally.
 class ActorRef {
-  final String path;
   final Actor _actor;
 
+  String get name => this._actor._name;
+  String get path => this._actor._path;
+
   /// The default constructor
-  ActorRef(this.path, this._actor);
+  ActorRef(this._actor);
 
   /// Returns a string representation of this actor ref
-  String toString() => "ActorRef(path=$path)";
+  String toString() => "ActorRef(path=${this.path})";
 
   /// Allows this object to be called like a function.  This aliases to the 
   /// actor's ActorProps call method.
@@ -75,6 +77,7 @@ class ActorRef {
 
   /// This future will complete when the backing actor has died
   Future get done => this._actor._onDone.future;
+
 }
 
 
@@ -119,7 +122,7 @@ class ActorStats {
 /// are managed by an actor system, which handles the marshalling of messages
 /// into and out of the system and between actors.  Actors may spawn child
 /// actors, which are then managed by the actor itself.  
-abstract class Actor {
+abstract class Actor extends ActorManager {
 
 	ActorSystem _system;
   ActorProps _props;
@@ -128,25 +131,32 @@ abstract class Actor {
   StreamSubscription<_MessagePair> _subscription;
 
   ActorRef _ref;
+  String _name;
+  String _path;
 
   final ActorStats _stats = new ActorStats();
+
   // This completer completes when the actor has been killed
   final Completer _onDone = new Completer();
 
   bool get _active => ! this._onDone.isCompleted;
   ActorRef get ref => this._ref;
+  ActorSystem get system => this._system;
 
   call(String name) => this._props(name);
 
 	/// This method is called when the actor is spawned.
 	/// The actor is not ready to accept messages until the
 	/// future returned by it completes.
-	Future setUp();
+	void setUp();
 
-  Future _setUp(ActorSystem system, String name, ActorProps props) async {
+  void _setUp(ActorSystem system, String name, String path, ActorProps props)
+      async {
     this._system = system;
     this._props = props;
-    this._ref = new ActorRef(this._system.name + '/' + name, this);
+    this._name = name;
+    this._path = path;
+    this._ref = new ActorRef(this);
     this._messageQueue = new StreamController<_MessagePair>();
     this._subscription = this._messageQueue.stream.listen(this._handle);
     print("${this.ref} _setUp()");
@@ -157,9 +167,11 @@ abstract class Actor {
 	/// This method is called when the actor dies.  The cause
 	/// of the actor's death does not matter; this method will
 	/// always be called.
-	Future tearDown();
+	void tearDown();
 
-  Future _tearDown() async {
+  void _tearDown() async {
+    // wait for all child actors to die
+    await this._actorsDone;
     // TODO: this behavior may need to be configured
     await this._subscription.cancel();
     await this.tearDown();
@@ -178,6 +190,8 @@ abstract class Actor {
     // handle default messages first
     if (pair.message == DefaultMessages.KILL) {
       print("${this.ref} is dying");
+      print("${this.ref} is killing all children");
+      await this._killAllActors();
       await this._system._removeActor(this);
       this._onDone.complete();
       return;
@@ -192,20 +206,18 @@ abstract class Actor {
     this._stats.increment("messages.sent");
 	}
 
-/*
-  void _receiveMessage(ActorRef sender, dynamic message) {
+  void incrementStat(String stat) => 
+    this._stats.increment("$stat");
 
-    this._stats.increment("messages.received");
-    this._messageQueue.add(new _MessagePair(sender, message));
-  }
-  */
+  void decrementStat(String stat) => 
+    this._stats.decrement("$stat");
 }
 
 
 /// A blackhole
 class DeadLetters extends Actor {
 
-  Future setUp() {}
-  Future tearDown() {}
+  void setUp() {}
+  void tearDown() {}
   void handle(ActorRef sender, dynamic message) {}
 }

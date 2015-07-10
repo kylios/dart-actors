@@ -1,30 +1,30 @@
 part of actors;
 
-class ActorSystem {
 
-	final String name;
-	final List<Actor> _actors = new List<Actor>();
+class _MessageSendActor extends Actor {
+
+  void setUp() {}
+  void tearDown() {}
+  void handle(ActorRef sender, dynamic message) {
+    this._props("completer").complete(message);
+    this.system.sendMessage(this.ref, DefaultMessages.KILL);
+  }
+}
+
+
+class ActorSystem extends ActorManager {
+
+	final String _path;
+  final ActorStats _stats = new ActorStats();
 
   final Actor _deadLetters = new DeadLetters();
+
+  ActorSystem get _system => this;
+  String get name => this._path;
 	
-	ActorSystem(this.name);	
+	ActorSystem(this._path);	
 
-  Future<ActorRef> createActor(Type actorCls, 
-      String actorName, [ActorProps props = null]) {
-
-    ClassMirror cls = reflectClass(actorCls);
-
-    if (props == null) {
-      props = new ActorProps.empty();
-    }
-
-    Actor a = cls.newInstance(new Symbol(''), []).reflectee;
-
-    // TODO: the system should have a mechanism that can create the actor
-    // in an isolate 
-    return this._addActor(a, actorName, props);
-  }
-
+  /*
 	Future<ActorRef> _addActor(Actor a, String actorName, ActorProps props) async {
     print("System: _addActor(name=$actorName)");
     await a._setUp(this, actorName, props);
@@ -37,6 +37,7 @@ class ActorSystem {
     await a._tearDown();
     this._actors.remove(a.ref.path);
   }
+  */
 
 	void _sendMessage(ActorRef sender, ActorRef receiver, dynamic message) {
 
@@ -52,6 +53,17 @@ class ActorSystem {
 
   void sendMessage(ActorRef receiver, dynamic message) {
     this._sendMessage(this._deadLetters, receiver, message);
+  }
+
+  Future sendMessageSync(ActorRef receiver, dynamic message) {
+    print("sendMessageSync(receiver=$receiver)");
+    Completer c = new Completer();
+    ActorProps props = new ActorProps.fromMap({
+        "completer": c
+      });
+    this.createActor(_MessageSendActor, "__ephemeral", props)
+      .then((ref) => this._sendMessage(ref, receiver, message));
+    return c.future;
   }
 
   Map<String, int> statCounts(ActorRef ref) => ref._actor._stats._counts;
