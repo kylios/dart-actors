@@ -8,7 +8,7 @@ import 'package:actors/test_utils.dart';
 
 void main() {
   group("Actor stats", () {
-      test("can increment", () {
+      test("can increment and decrement", () {
 
           ActorStats stats = new ActorStats();
 
@@ -28,6 +28,7 @@ void main() {
             });
         });
     });
+
   group("Actor System", () {
 
       test("initializes", () {
@@ -61,10 +62,10 @@ void main() {
 
           ActorRef ref = await system.createActor(PongActor, 'PONG');
           expect(ref, isNot(equals(null)));
-          var message = await system.sendMessageSync(ref, "PING");
+          var message = await system.sendMessageSync(ref, new PingMessage());
 
           expect(system.statCounts(ref)['messages.handled'], equals(1));
-          expect(message, equals("PONG"));
+          expect(message.runtimeType, equals(PongMessage));
         });
     });
 
@@ -82,13 +83,20 @@ void main() {
           expect(pong.path, equals("${system.name}/${pong.name}"));
           expect(pong.active, equals(true));
 
+          Completer<dynamic> waitForPong = new Completer<dynamic>();
           ActorRef ping = 
             await system.createActor(PingActor, 'ping', 
-              new ActorProps.fromMap({"receiver": pong}));
+              new ActorProps.fromMap({
+                "receiver": pong,
+                "completer": waitForPong
+              }));
 
           expect(ping, isNot(equals(null)));
           expect(ping.path, equals("${system.name}/${ping.name}"));
           expect(ping.active, equals(true));
+
+          var message = await waitForPong.future;
+          expect(message.runtimeType, equals(PongMessage));
 
           print("Actors created");
 
@@ -127,17 +135,26 @@ void main() {
           ActorRef parent1 = await system.createActor(TestParentActor, 'parent',
             new ActorProps.empty());
 
+          expect(system.stats.counts['actors.begin_add'], equals(1));
+          expect(system.stats.counts['actors.end_add'], equals(1));
           expect(system.statCounts(parent1)['actors.begin_add'], equals(3));
           expect(system.statCounts(parent1)['actors.end_add'], equals(3));
 
-          Map<String, int> child1Counts = await system.sendMessageSync(parent1, 'get_child1_counts');
-          Map<String, int> child2Counts = await system.sendMessageSync(parent1, 'get_child2_counts');
-          Map<String, int> child3Counts = await system.sendMessageSync(parent1, 'get_child3_counts');
+          ChildCounts child1Counts = await system.sendMessageSync(parent1,
+            new GetChildCounts(1));
+          ChildCounts child2Counts = await system.sendMessageSync(parent1,
+            new GetChildCounts(2));
+          ChildCounts child3Counts = await system.sendMessageSync(parent1,
+            new GetChildCounts(3));
 
-          expect(child1Counts['setup'], equals(1));
-          expect(child2Counts['setup'], equals(1));
-          expect(child3Counts['setup'], equals(1));
+          expect(child1Counts.counts['setup'], equals(1));
+          expect(child2Counts.counts['setup'], equals(1));
+          expect(child3Counts.counts['setup'], equals(1));
 
+          system.sendMessage(parent1, DefaultMessages.KILL);
+          await parent1.done;
+
+          // TODO: check global stats
         });
     });
 }

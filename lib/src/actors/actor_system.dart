@@ -3,9 +3,11 @@ part of actors;
 
 class _MessageSendActor extends Actor {
 
-  void setUp() {}
+  void setUp() {
+    this.registerUmbrella(this._handleMessage);
+  }
   void tearDown() {}
-  void handle(ActorRef sender, dynamic message) {
+  void _handleMessage(ActorRef sender, dynamic message) {
     this._props("completer").complete(message);
     this.system.sendMessage(this.ref, DefaultMessages.KILL);
   }
@@ -15,7 +17,7 @@ class _MessageSendActor extends Actor {
 class ActorSystem extends ActorManager {
 
 	final String _path;
-  final ActorStats _stats = new ActorStats();
+  final ActorStats stats = new ActorStats();
 
   final Actor _deadLetters = new DeadLetters();
 
@@ -66,5 +68,5 @@ class ActorSystem extends ActorManager {
     return c.future;
   }
 
-  Map<String, int> statCounts(ActorRef ref) => ref._actor._stats._counts;
+  Map<String, int> statCounts(ActorRef ref) => ref._actor.stats._counts;
 }

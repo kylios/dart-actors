@@ -114,6 +114,12 @@ class ActorStats {
 }
 
 
+/// Messages should be registered within the Actor with a callback of this 
+/// format.  When the actor receives a message of the registered type, the
+/// associated handler will be called.
+typedef void MessageHandler(ActorRef sender, dynamic message);
+
+
 /// The main actor class.  This class should be subclassed.  It handles the full
 /// lifecycle of an actor.  
 /// 
@@ -130,25 +136,55 @@ abstract class Actor extends ActorManager {
   StreamController<_MessagePair> _messageQueue;
   StreamSubscription<_MessagePair> _subscription;
 
+  // The ActorRef that proxies this Actor
   ActorRef _ref;
+
+  // The actor's name and path
   String _name;
   String _path;
 
-  final ActorStats _stats = new ActorStats();
+  // This maps message types to handler functions
+  final Map<Type, MessageHandler> _handlers = new Map<Type, MessageHandler>();
+  // If set, this will handle message not handled by a specific handler
+  MessageHandler _umbrella = null;
 
   // This completer completes when the actor has been killed
   final Completer _onDone = new Completer();
 
+  // Indicates whether the actor is still handling messages
   bool get _active => ! this._onDone.isCompleted;
+
+  final ActorStats stats = new ActorStats();
+
   ActorRef get ref => this._ref;
   ActorSystem get system => this._system;
 
+  /// Calling this actor using a property name as an argument returns that
+  /// property's value
   call(String name) => this._props(name);
+
+  void registerHandler(Type messageType, MessageHandler handler) =>
+    this._handlers[messageType] = handler;
+  void unregisterHandler(Type messageType) => 
+    this._handlers[messageType] = null;
+  void registerUmbrella(MessageHandler umbrella) => this._umbrella = umbrella;
+  void unregisterUmbrella() => this._umbrella = null;
 
 	/// This method is called when the actor is spawned.
 	/// The actor is not ready to accept messages until the
 	/// future returned by it completes.
 	void setUp();
+
+  /// This method is called when the actor dies.  The cause
+  /// of the actor's death does not matter; this method will
+  /// always be called.
+  void tearDown();
+
+  /// Send a message to another actor.
+  void sendMessage(ActorRef receiver, dynamic message) {
+    this._system._sendMessage(this._ref, receiver, message);
+    this.stats.increment("messages.sent");
+  }
 
   void _setUp(ActorSystem system, String name, String path, ActorProps props)
       async {
@@ -164,11 +200,6 @@ abstract class Actor extends ActorManager {
     await this.setUp();
   }
 
-	/// This method is called when the actor dies.  The cause
-	/// of the actor's death does not matter; this method will
-	/// always be called.
-	void tearDown();
-
   void _tearDown() async {
     // wait for all child actors to die
     await this._actorsDone;
@@ -178,14 +209,9 @@ abstract class Actor extends ActorManager {
     this._messageQueue.close();
   }
 
-	/// Handle a message incoming to this actor.  Messages
-	/// may come in any type; it is up to the implementation 
-	/// to check the type and handle the contents appropriately.
-	void handle(ActorRef sender, dynamic message);
-
   Future _handle(_MessagePair pair) async {
 
-    this._stats.increment("messages.handled");
+    this.stats.increment("messages.handled");
 
     // handle default messages first
     if (pair.message == DefaultMessages.KILL) {
@@ -197,20 +223,21 @@ abstract class Actor extends ActorManager {
       return;
     }
 
-    this.handle(pair.sender, pair.message);
+    Type t = pair.message.runtimeType;
+    print("Type: $t");
+    if (this._handlers[t] == null) {
+      // TODO: error?
+      print("INFO: ${this.ref} received a message ${pair.message} from ${pair.sender} but no handler is registered.");
+
+      if (this._umbrella != null) {
+        this._umbrella(pair.sender, pair.message);
+      } else {
+        print("WARNING: no umbrella registered");
+      }
+    } else {
+      this._handlers[t](pair.sender, pair.message);
+    }
   }
-
-	/// Send a message to another actor.
-	void sendMessage(ActorRef receiver, dynamic message) {
-		this._system._sendMessage(this._ref, receiver, message);
-    this._stats.increment("messages.sent");
-	}
-
-  void incrementStat(String stat) => 
-    this._stats.increment("$stat");
-
-  void decrementStat(String stat) => 
-    this._stats.decrement("$stat");
 }
 
 
